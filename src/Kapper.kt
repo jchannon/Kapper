@@ -6,10 +6,7 @@ import kotlin.reflect.KMutableProperty
 import kotlin.reflect.full.createInstance
 import kotlin.reflect.full.memberProperties
 
-//class Kapper {
 fun <T : Any> get(c: KClass<T>, sql: String, conn: Connection): List<T> {
-
-    //val g = hashMapOf("int8" to "Int")
 
     var results = mutableListOf<T>()
 
@@ -17,47 +14,37 @@ fun <T : Any> get(c: KClass<T>, sql: String, conn: Connection): List<T> {
 
     val statement = conn.createStatement()
     val reader = statement.executeQuery(sql)
-    
+
+    val columns = (1..reader.metaData.columnCount).map { reader.metaData.getColumnName(it) }
+
+    var isSet = false
+
     while (reader.next()) {
         c.memberProperties
                 .filterIsInstance<KMutableProperty<*>>()
                 .forEach {
-                    for (i in 1..reader.metaData.columnCount) {
-                        var colName = reader.metaData.getColumnName(i)
-                        // println(reader.metaData.getColumnTypeName(i))
-                        if (colName.equals(it.name, true)) {
-                            //println("found " + it.name + " & " + colName)
-
-                            when (reader.metaData.getColumnTypeName(i)) {
-                                "varchar" -> it.setter.call(instance, reader.getString(colName))
-                                "int8" -> it.setter.call(instance, reader.getInt(colName))
-                                "int4" -> it.setter.call(instance, reader.getInt(colName))
-                                "serial" -> it.setter.call(instance, reader.getInt(colName))
-                                "timestamp" -> it.setter.call(instance, reader.getDate(colName))
-                                "bool" -> it.setter.call(instance, reader.getBoolean(colName))
-                            }
-
-                            break
-                        }
+                    if (columns.any { s -> s.equals(it.name, true) }) {
+                        it.setter.call(instance, reader.getObject(it.name))
+                        isSet = true
                     }
                 }
+
+        if (isSet) {
+            results.add(instance)
+            isSet = false
+        }
     }
-
-    results.add(instance)
-
     return results
 }
 
-//inline fun <reified T : Any> get(sql: String) = get(T::class, sql)
 
 inline fun <reified T : Any> Connection.query(sql: String) = get(T::class, sql, this)
 inline fun <reified T : Any> Connection.queryfirst(sql: String) = get(T::class, sql, this).first()
 
-//}
 
 class Foo {
-    var myname: String = "poo"
-    var other: String = "jkl"
+    var myname: String = "emptyName"
+    var other: String = "emptyOther"
     var version: String = "empty"
     var id: Int = 0
     var lastportusageupdate: Date = Date()
@@ -70,12 +57,16 @@ class Setting {
     var DefaultValue: String = ""
     var Description: String = ""
     var Visible: Boolean = false
+    var fred: String = "should not be found in column list"
 
 }
 
 fun main(args: Array<String>) {
 
     val conn = DriverManager.getConnection("jdbc:postgresql:amdb")
+
+    val foo = conn.queryfirst<Foo>("select * from system")
+    println(foo.lastportusageupdate)
 
     val bar = conn.query<Setting>("select * from setting")
     println(bar.first().Id)
@@ -84,6 +75,7 @@ fun main(args: Array<String>) {
     println(bar.first().DefaultValue)
     println(bar.first().Description)
     println(bar.first().Visible)
+    println(bar.first().fred)
 
     var setting = conn.queryfirst<Setting>("select * from setting")
     println(setting.Id)
@@ -92,5 +84,6 @@ fun main(args: Array<String>) {
     println(setting.DefaultValue)
     println(setting.Description)
     println(setting.Visible)
+    println(setting.fred)
 }
 
