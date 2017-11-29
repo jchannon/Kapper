@@ -1,5 +1,5 @@
 # Kapper
-A MicroORM for Kotlin
+A MicroORM for Kotlin inspired by [Dapper](https://github.com/StackExchange/Dapper) on .NET
 
 ## Usage
 ```
